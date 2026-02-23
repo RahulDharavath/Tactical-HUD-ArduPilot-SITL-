@@ -369,7 +369,9 @@ Clean Exit:
 
     cap.release()
     cv2.destroyAllWindows()
+    
   Prevents memory leaks and ensures proper shutdown.
+  
 ---
 
 ## Performance Results
@@ -430,6 +432,7 @@ This ensures stable FPS display and avoids jitter.
 
 
 ---
+
 ## video
 
 
