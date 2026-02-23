@@ -1,0 +1,5 @@
+pymavlink
+MAVProxy
+opencv-python==4.10.0.84
+ultralytics
+numpy==1.26.4
