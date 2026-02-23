@@ -16,20 +16,25 @@ The goal is to simulate a surveillance-style system where a drone streams teleme
 
 ---
 
-In this project we are using simulation software instead of using real drone hardware,and they are  three software compontent using it.
+In this project, we use simulation software instead of real drone hardware.
 
+Three main software components are used:
   1. For Drone --> We are using ArduPilot + SITL. Which acts as real drone.
   2. For Ground Control Station (GCS) --> we are using MAVProxy.
   3. For communication --> we are using MAVLink.
 
 ## ArduPilot:
-ArduPilot is the world's most advanced & versatile open-source autopilot software system. It is designed to provide autonomus control, stablization, and mission capabilities for a vast range of unmanned vehicles.
+ArduPilot is the world's most advanced & versatile open-source autopilot software system. 
+
+It provides autonomous control, stabilization, and mission capabilities for various unmanned vehicles such as drones, rovers, boats, and submarines.
 
 ## SITL: Software In The Loop
 SITL is a simulation method that allow us to run autopilot firmware(like Ardupilot or PX4) directly on our computer processor without needing any physical flight controller hardware.
 
 ## MAVProxy:
-MAVProxy is a lightweight, terminal-based ground control station (GCS) for MAVLink-enabled drones like ArduPilot SITL. It provides real-time telemetry monitoring and direct flight control through simple text commands.
+MAVProxy is a lightweight, terminal-based ground control station (GCS) for MAVLink-enabled drones like ArduPilot SITL. 
+
+It provides real-time telemetry monitoring and direct flight control through simple text commands.
 
             # Flight control
     mode GUIDED/AUTO     # Enable guided/autonomous mode
@@ -47,9 +52,11 @@ MAVProxy is a lightweight, terminal-based ground control station (GCS) for MAVLi
 MAVLink stands for Micro Air Vehicle Link.
 
 It is a lightweight, open-source messaging protocol designed for communication between drones (UAVs) and ground control systems.
-It sends small structured packets.
+
+It sends small structured data packets.
 
 Each packet contains:
+
 * Message ID
 * Data fields (sensor data like GPS, speed, battery, etc.)
 * Timestamp
@@ -68,11 +75,12 @@ In the same way, a drone sends its status data such as:
 * Ground speed
 * Mode
 * Battery level
-* 
+  
 Without telemetry, we cannot know the drone’s condition — like how much battery is left, which direction it is moving, or which flight mode it is using.
+
 Telemetry is also used in different fields such as space systems, UAVs, automotive systems, etc.
 
-## How Telemetry Works (Step-by-Step)
+## How Telemetry Works
 
 STEP 1: Sensor Data Collection
 First, the drone collects data from its sensors, such as:
@@ -86,6 +94,7 @@ STEP 2: Autopilot Processes the Data
 Software like  ArduPilot acts as the drone’s brain.
 
 It continuously processes:
+
 * GPS position
 * Sensor data
 * IMU readings
@@ -116,10 +125,12 @@ This transmission can happen through:
 * Serial connection
 * UDP
 * TCP
-  
+
+In this project, we use UDP for local communication.
+
 UDP is simply a communication method that allows two programs to send data to each other over a network connection.
 
-To Decode the mavlink data message we are using pymavlink (python library.
+To decode MAVLink messages in Python, we use the pymavlink library.
 
 ---
 
@@ -179,7 +190,7 @@ Workflow:
 
 Terminal 1
     
-    cd ~/Desktop/ArudPilot_SITL/ardupilot
+    cd ~/Desktop/ArduPilot_SITL/ardupilot
     Tools/autotest/sim_vehicle.py -v ArduCopter --console --map
     
 Terminal 2 
@@ -196,6 +207,8 @@ Terminal 2
 ---
 ## Telemetry Module:
 The TelemetryHandler module connects to ArduPilot SITL using MAVLink protocol & extracts real time telemetry data for HUD display.
+
+`pymavlink` is used to establish communication with SITL.
 
     from pymavlink import mavutil
   This library allows communication with flight controllers or SITL.
@@ -221,8 +234,7 @@ The TelemetryHandler module connects to ArduPilot SITL using MAVLink protocol & 
   It stores latest telemetry data. and easy to pass into HUD display.
 
     msg = self.conn.recv_match(blocking=False)
-  Why we using blocking=False bcz it prevents freezing video loop. &  even if no telemetry message available -> immediately continue.
-  Its Ensures smooth real-time performance.
+  prevents the video loop from freezing and ensures smooth real-time performance.
 
     msg_type = msg.get_type()
     if msg_type == "GLOBAL_POSITION_INT":
@@ -230,14 +242,33 @@ The TelemetryHandler module connects to ArduPilot SITL using MAVLink protocol & 
     elif msg_type == "SYS_STATUS":
     elif msg_type == "HEARTBEAT":
   Every MAVLink message has a type name.
-  which provides:
-  * Latitude, * Longitude, * Relative altitude, * Ground speed, * Heading, * battery life, * mode (like guided, auto, stablize)
+  
+  The module extracts:
+  
+  * Latitude
+  * Longitude
+  * Relative altitude
+  * Ground speed
+  * Heading
+  * battery level
+  * flight mode (like guided, auto, stablize)
 
 ---
 
-## Tracker Module:
-I used Euclidean distance formula to track closer to center crossline.
+## Tracker Module: Target selection logic
 
+The tracker selects the vehicle closest to the screen center using the Euclidean distance formula.
+
+The logic works as follows:
+
+* Start with infinite minimum distance.
+* Compare each detected vehicle’s distance from the screen center.
+* Update the selected vehicle if a closer one is found.
+* Ignore vehicles that are farther away.
+  
+This ensures automatic and deterministic target locking.
+
+    # Example:
     # min_dist = float("inf")    -->  Start: infinit
     # selected_box = None
 
@@ -261,6 +292,19 @@ I used Euclidean distance formula to track closer to center crossline.
 ---
 
 ## HUD Module:
+
+The HUD module draws the tactical interface overlay.
+
+It renders:
+
+* A center crosshair
+* Telemetry values (altitude, speed, heading, battery, etc.)
+* Timestamp
+* Highlighted locked target
+
+The crosshair is drawn using horizontal and vertical lines centered in the frame.
+
+Telemetry text is displayed line by line on the left side of the screen using `cv2.putText`.
 
         # crosshair explanation:
     # Frame: 1280x720 → h=720, w=1280, channels=3 (BGR)
@@ -298,129 +342,92 @@ I used Euclidean distance formula to track closer to center crossline.
 ---
 ## Main Module:
 
-    telemetry = TelemetryHandler()
-    detector = Detector()
-    selector = TargetSelector(detector.model)
-    hud = HUDRenderer()
-* Initializes all modules.
-* Telemetry connects to SITL via MAVLink.
-* Detector loads YOLO model.
-* Tracker handles automatic vehicle locking.
-* HUD module handles all overlay drawing.
+The `main.py` file integrates all components together.
 
-      cap = cv2.VideoCapture("ss.mp4")
-* Opens video file.
-* Acts as simulated UAV camera feed.
-* Frames are processed in real time.
+* Initializes all modules
+* Opens video feed
+* Runs detection and tracking
+* Selects target
+* Updates telemetry
+* Draws the HUD
+* Calculates FPS
+* Displays final output
 
-      frame_count = 0
-      skip_frames = 2
-      last_results = None
-      fps = 0
-  skip_frames reduces detection frequency.
-Detection runs every 2 frames.
-Improves performance while keeping tracking stable.
-fps stores smoothed FPS value.
+To improve performance, detection runs every two frames using skip logic. This reduces CPU usage while maintaining stable tracking.
 
-      while True:
-  Each loop processes one video frame.
+FPS is calculated using:
 
-Step 1: Read Frame
+    FPS = 1 / time_taken_per_frame
+A smoothing formula is applied to prevent FPS fluctuation:
 
-      ret, frame = cap.read()
-  * Reads next frame from video.
-  * If no frame available → loop stops.
-
-Step 2: Resize Frame
-
-      frame = cv2.resize(frame, (416, 416))
-
-* Reduces resolution.
-* Speeds up YOLO inference.
-* Improves overall FPS.
-
-Step 3: Detection with Skip Logic
-
-      if frame_count % skip_frames == 0:
-      results = detector.detect(frame)
-* Detection runs every 2 frames.
-* Other frames reuse previous results.
-* Reduces CPU load.
-* Maintains smooth visual tracking.
-
-Step 4: Draw Detection Boxes
-
-For each detected object:
-* Extract bounding box coordinates
-* Get confidence score
-* Get class label (car, bus, truck, etc.)
-* Get tracking ID from ByteTrack
-* Draw box and label on screen
-* Ex: ID:3 car 0.87
-  
-Step 5: Target Selection
-
-    target_box = selector.select_target(results, frame.shape)
-* Automatically selects vehicle closest to screen center.
-* Implements auto-lock logic.
-* Returns selected bounding box.
-
-Step 6: Telemetry Update
-
-      telem_data = telemetry.update()
-      
-* Fetches live telemetry from SITL.
-* Non-blocking (does not slow video).
-
-Returns:
-* Latitude
-* Longitude
-* Altitude
-* Speed
-* Heading
-* Mode
-* Battery
-
-Step 7: HUD Rendering
-
-    hud.draw_crosshair(annotated)
-    hud.draw_telemetry(annotated, telem_data)
-    hud.draw_timestamp(annotated)
-    hud.highlight_target(annotated, target_box)
-
-Draws tactical interface elements:
-* Center crosshair
-* Telemetry text
-* Timestamp
-* Highlight locked target
-
-Step 8: FPS Calculation
-
-    new_fps = 1 / (time.time() - start)
     fps = 0.9 * fps + 0.1 * new_fps
-* Measures time taken per frame.
-* Calculates frames per second.
-* Applies smoothing for stable display.
-* Shows performance on screen.
 
-Step 9: Display Output
+This ensures stable real-time performance display.
 
-    cv2.imshow("AI Tactical HUD", annotated)
+Clean Exit:
 
-  Displays final output combining:
-* Detection
-* Tracking
-* Telemetry
-* HUD
-* FPS
-
-step 10: Clean Exit
 
     cap.release()
     cv2.destroyAllWindows()
-* Releases video resources.
-* Prevents memory leaks.
-* Safely closes program.
+  Prevents memory leaks and ensures proper shutdown.
+---
+
+## Performance Results
+Hardware Used
+
+The system was tested on:
+
+Machine: MacBook (CPU-based execution)
+Processor: (1.8 GHz Dual-Core Intel Core i5)
+RAM: (8 GB 1600 MHz DDR3)
+
+---
+
+## Model Configuration
+
+Model: YOLOv8 Nano
+Input Resolution: 416 × 416
+Tracker: ByteTrack (built-in YOLO integration)
+Frame Skip: 2 (detection runs every 2 frames)
+
+The Nano model was selected to maintain a balance between detection accuracy and real-time performance.
+
+---
+
+## Optimization Techniques Applied
+
+To meet real-time performance requirements, the following optimizations were implemented:
+
+1. Frame Resizing
+   
+All frames are resized to 416×416 before inference.
+
+Lower resolution reduces computational load and increases FPS.
+
+2. Skip Logic
+   
+Detection runs every two frames instead of every frame.
+
+Intermediate frames reuse previous detection results.
+
+This reduces model inference load by approximately 50%.
+
+3. Manual Bounding Box Rendering
+   
+Instead of using `results.plot()` (which is heavier), bounding boxes are drawn manually using OpenCV.
+
+This reduces rendering overhead.
+
+4. Non-Blocking Telemetry
+
+This prevents the video loop from freezing and ensures smooth rendering.
+
+5. FPS Smoothing
+   
+A weighted moving average is applied:
+`fps = 0.9 * fps + 0.1 * new_fps`
+This ensures stable FPS display and avoids jitter.
+
 
 ---
 ## video
