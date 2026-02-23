@@ -423,6 +423,14 @@ step 10: Clean Exit
 * Safely closes program.
 
 ---
-## Using Skip frame 2 Result video
+## video
 
-[Click here to watch the video](file:///Users/dharavathrajesh/Desktop/ardupilot.mov)
+
+
+
+
+https://github.com/user-attachments/assets/e9de7181-b84b-4909-9224-2af2fafa469f
+
+
+
+
